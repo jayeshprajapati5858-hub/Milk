@@ -11,7 +11,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   Check,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 
 // Helpers
@@ -42,12 +43,12 @@ const App: React.FC = () => {
         if (typeof r.cow === 'boolean') return r;
         
         // Convert old number/qty format to boolean
-        // If cowQty > 0 -> cow = true
-        // If buffaloQty > 0 -> buffalo = true
         return {
           date: r.date,
           cow: (r.cowQty > 0 || r.quantity > 0) ? true : false,
-          buffalo: (r.buffaloQty > 0) ? true : false
+          buffalo: (r.buffaloQty > 0) ? true : false,
+          cowReason: '',
+          buffaloReason: ''
         };
       });
       setRecords(migrated);
@@ -73,7 +74,7 @@ const App: React.FC = () => {
   // Handlers
   const selectedDateStr = useMemo(() => selectedDate.toISOString().split('T')[0], [selectedDate]);
   
-  const getRecord = (dateStr: string) => records.find(r => r.date === dateStr) || { date: dateStr, cow: false, buffalo: false };
+  const getRecord = (dateStr: string) => records.find(r => r.date === dateStr) || { date: dateStr, cow: false, buffalo: false, cowReason: '', buffaloReason: '' };
 
   const toggleRecord = (dateStr: string, type: 'cow' | 'buffalo', value: boolean) => {
     setRecords(prev => {
@@ -84,7 +85,9 @@ const App: React.FC = () => {
         const current = prev[existingIndex];
         newRecord = {
           ...current,
-          [type]: value
+          [type]: value,
+          // If turning ON (true), clear the reason for NOT taking it? 
+          // Maybe keep it just in case they toggle back. Let's keep it but UI won't show it.
         };
         const newRecords = [...prev];
         newRecords[existingIndex] = newRecord;
@@ -93,9 +96,31 @@ const App: React.FC = () => {
         newRecord = {
           date: dateStr,
           cow: type === 'cow' ? value : false,
-          buffalo: type === 'buffalo' ? value : false
+          buffalo: type === 'buffalo' ? value : false,
+          cowReason: '',
+          buffaloReason: ''
         };
         return [...prev, newRecord];
+      }
+    });
+  };
+
+  const handleReasonChange = (dateStr: string, type: 'cow' | 'buffalo', reason: string) => {
+    setRecords(prev => {
+      const existingIndex = prev.findIndex(r => r.date === dateStr);
+      if (existingIndex >= 0) {
+        const current = prev[existingIndex];
+        const newRecord = { ...current, [type === 'cow' ? 'cowReason' : 'buffaloReason']: reason };
+        const newRecords = [...prev];
+        newRecords[existingIndex] = newRecord;
+        return newRecords;
+      } else {
+        return [...prev, {
+          date: dateStr,
+          cow: false,
+          buffalo: false,
+          [type === 'cow' ? 'cowReason' : 'buffaloReason']: reason
+        }];
       }
     });
   };
@@ -243,8 +268,8 @@ const App: React.FC = () => {
           <div className="p-6 space-y-6">
             
             {/* Cow Input */}
-            <div>
-              <div className="flex justify-between items-center mb-3">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
                    <span className="font-bold text-gray-800">ગાય (Cow)</span>
@@ -268,7 +293,7 @@ const App: React.FC = () => {
                   onClick={() => toggleRecord(selectedDateStr, 'cow', false)}
                   className={`flex-1 py-3 rounded-xl border-2 flex items-center justify-center gap-2 transition-all ${
                     !currentRecord.cow 
-                    ? 'bg-gray-100 border-gray-300 text-gray-700' 
+                    ? 'bg-gray-100 border-gray-300 text-gray-700 shadow-inner' 
                     : 'bg-white border-gray-100 text-gray-400'
                   }`}
                 >
@@ -276,13 +301,29 @@ const App: React.FC = () => {
                   <span className="font-medium">ના (નથી)</span>
                 </button>
               </div>
+
+              {/* Reason Input for Cow - Visible only when NO is selected */}
+              {!currentRecord.cow && (
+                <div className="animate-fade-in-down">
+                  <div className="relative">
+                    <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <input 
+                      type="text"
+                      placeholder="કારણ? (દા.ત. બહારગામ)"
+                      value={currentRecord.cowReason || ''}
+                      onChange={(e) => handleReasonChange(selectedDateStr, 'cow', e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-300 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="h-px bg-gray-100"></div>
 
             {/* Buffalo Input */}
-            <div>
-              <div className="flex justify-between items-center mb-3">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                    <span className="font-bold text-gray-800">ભેંસ (Buffalo)</span>
@@ -306,7 +347,7 @@ const App: React.FC = () => {
                   onClick={() => toggleRecord(selectedDateStr, 'buffalo', false)}
                   className={`flex-1 py-3 rounded-xl border-2 flex items-center justify-center gap-2 transition-all ${
                     !currentRecord.buffalo 
-                    ? 'bg-gray-100 border-gray-300 text-gray-700' 
+                    ? 'bg-gray-100 border-gray-300 text-gray-700 shadow-inner' 
                     : 'bg-white border-gray-100 text-gray-400'
                   }`}
                 >
@@ -314,6 +355,22 @@ const App: React.FC = () => {
                   <span className="font-medium">ના (નથી)</span>
                 </button>
               </div>
+
+              {/* Reason Input for Buffalo - Visible only when NO is selected */}
+              {!currentRecord.buffalo && (
+                <div className="animate-fade-in-down">
+                  <div className="relative">
+                    <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <input 
+                      type="text"
+                      placeholder="કારણ? (દા.ત. બિમાર)"
+                      value={currentRecord.buffaloReason || ''}
+                      onChange={(e) => handleReasonChange(selectedDateStr, 'buffalo', e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-300 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>
@@ -343,6 +400,7 @@ const App: React.FC = () => {
               
               const hasCow = record.cow;
               const hasBuffalo = record.buffalo;
+              const hasReason = (!hasCow && record.cowReason) || (!hasBuffalo && record.buffaloReason);
 
               let borderClass = isSelected ? 'ring-2 ring-indigo-500 ring-offset-1 z-10' : 'border border-transparent';
               if (isToday && !isSelected) borderClass = 'border border-indigo-300';
@@ -361,6 +419,8 @@ const App: React.FC = () => {
                   <div className="flex gap-1 mt-1">
                     {hasCow && <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>}
                     {hasBuffalo && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
+                    {/* Reason Indicator (small gray dot) */}
+                    {hasReason && !hasCow && !hasBuffalo && <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>}
                   </div>
                 </button>
               );

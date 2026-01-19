@@ -5,6 +5,7 @@ const getSystemPrompt = () => `
 You are a smart assistant for a Gujarati household milk tracker app.
 Your role is to analyze the milk collection data (Yes/No records) and provide a summary in GUJARATI language only.
 You should calculate the total estimated bill based on the "Price Per Day" provided.
+If there are reasons mentioned for not taking milk, summarize them as well.
 Be polite, helpful and concise.
 `;
 
@@ -20,9 +21,19 @@ export const analyzeMilkData = async (
     // Create a readable summary for the AI
     const recordsSummary = records.map(r => {
       const parts = [];
-      if (r.cow) parts.push(`ગાય: હા`);
-      if (r.buffalo) parts.push(`ભેંસ: હા`);
-      if (parts.length === 0) return `${r.date}: દૂધ નથી લીધું`;
+      
+      if (r.cow) {
+        parts.push(`ગાય: હા`);
+      } else {
+        parts.push(`ગાય: ના${r.cowReason ? ` (કારણ: ${r.cowReason})` : ''}`);
+      }
+
+      if (r.buffalo) {
+        parts.push(`ભેંસ: હા`);
+      } else {
+        parts.push(`ભેંસ: ના${r.buffaloReason ? ` (કારણ: ${r.buffaloReason})` : ''}`);
+      }
+
       return `${r.date}: ${parts.join(', ')}`;
     }).join('\n');
 
@@ -39,7 +50,8 @@ export const analyzeMilkData = async (
       1. ગાયનું દૂધ કેટલા દિવસ લીધું?
       2. ભેંસનું દૂધ કેટલા દિવસ લીધું?
       3. ગાય અને ભેંસ બંનેનું મળીને કુલ અનુમાનિત બિલ.
-      4. દૂધ લેવાની નિયમિતતા વિશે ટૂંકમાં જણાવો.
+      4. દૂધ ન લેવાના મુખ્ય કારણો (જો કોઈ હોય તો).
+      5. અન્ય કોઈ મહત્વની નોંધ.
 
       જવાબ માત્ર ગુજરાતી ભાષામાં જ આપો.
     `;

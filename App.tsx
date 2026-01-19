@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { DailyRecord } from './types';
 import { analyzeMilkData } from './services/geminiService';
 import { StatCard } from './components/StatCard';
@@ -13,7 +13,10 @@ import {
   Check,
   X,
   MessageSquare,
-  AlertCircle
+  AlertCircle,
+  Share2,
+  Download,
+  Upload
 } from 'lucide-react';
 
 // Helpers
@@ -32,6 +35,8 @@ const App: React.FC = () => {
   const [loadingAi, setLoadingAi] = useState<boolean>(false);
   const [aiInsight, setAiInsight] = useState<string>('');
   const [showConfig, setShowConfig] = useState<boolean>(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load data & Migrate old data if necessary
   useEffect(() => {
@@ -184,6 +189,75 @@ const App: React.FC = () => {
     setAiInsight('');
   };
 
+  // Backup & Restore
+  const handleExportData = () => {
+    const dataStr = JSON.stringify(records, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `milk-records-backup-${getTodayString()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed)) {
+          setRecords(parsed);
+          alert('ડેટા સફળતાપૂર્વક રિસ્ટોર થયો છે!');
+        } else {
+          alert('ફાઈલ ફોર્મેટ ખોટું છે.');
+        }
+      } catch (err) {
+        alert('ફાઈલ વાંચવામાં ભૂલ આવી છે.');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    event.target.value = '';
+  };
+
+  // WhatsApp Share
+  const handleWhatsAppShare = () => {
+    const monthName = getMonthString(selectedDate);
+    const text = `
+🥛 *દૂધનો હિસાબ - ${monthName}* 🥛
+
+🗓 કુલ દિવસ: ${currentMonthStats.activeDays}
+
+🐄 *ગાય:*
+- દિવસ: ${currentMonthStats.totalCowDays}
+- ભાવ: ₹${cowPrice}
+- રકમ: ₹${currentMonthStats.totalCowDays * cowPrice}
+
+🐃 *ભેંસ:*
+- દિવસ: ${currentMonthStats.totalBuffaloDays}
+- ભાવ: ₹${buffaloPrice}
+- રકમ: ₹${currentMonthStats.totalBuffaloDays * buffaloPrice}
+
+💰 *કુલ બાકી રકમ: ₹${currentMonthStats.totalCost}*
+
+(દૂધનો હિસાબ એપ દ્વારા જનરેટ કરેલ)
+    `.trim();
+
+    const encodedText = encodeURIComponent(text);
+    window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+  };
+
   // Calendar Helpers
   const daysInMonth = useMemo(() => {
     const year = selectedDate.getFullYear();
@@ -219,38 +293,70 @@ const App: React.FC = () => {
         {/* Settings Dropdown */}
         {showConfig && (
           <div className="max-w-md mx-auto mt-4 bg-white text-gray-800 p-4 rounded-xl shadow-xl animate-fade-in-down border border-indigo-100">
-            <h3 className="font-bold text-gray-700 mb-3 border-b pb-2">રોજનો ફિક્સ ભાવ (Daily Price)</h3>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-xs font-medium text-green-700 mb-1">ગાય (Cow)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-gray-400">₹</span>
-                  <input 
-                    type="number" 
-                    value={cowPrice} 
-                    onChange={(e) => setCowPrice(Number(e.target.value))}
-                    className="w-full pl-6 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none"
-                  />
+            <h3 className="font-bold text-gray-700 mb-3 border-b pb-2">સેટિંગ્સ (Settings)</h3>
+            
+            <div className="mb-4">
+               <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">રોજનો ભાવ (Daily Price)</label>
+               <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-medium text-green-700 mb-1">ગાય (Cow)</label>
+                    <div className="relative">
+                    <span className="absolute left-3 top-2 text-gray-400">₹</span>
+                    <input 
+                        type="number" 
+                        value={cowPrice} 
+                        onChange={(e) => setCowPrice(Number(e.target.value))}
+                        className="w-full pl-6 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none"
+                    />
+                    </div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-blue-700 mb-1">ભેંસ (Buffalo)</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-gray-400">₹</span>
-                  <input 
-                    type="number" 
-                    value={buffaloPrice} 
-                    onChange={(e) => setBuffaloPrice(Number(e.target.value))}
-                    className="w-full pl-6 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                <div>
+                    <label className="block text-xs font-medium text-blue-700 mb-1">ભેંસ (Buffalo)</label>
+                    <div className="relative">
+                    <span className="absolute left-3 top-2 text-gray-400">₹</span>
+                    <input 
+                        type="number" 
+                        value={buffaloPrice} 
+                        onChange={(e) => setBuffaloPrice(Number(e.target.value))}
+                        className="w-full pl-6 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                    </div>
                 </div>
+               </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">ડેટા બેકઅપ (Backup)</label>
+              <div className="flex gap-3">
+                <button 
+                  onClick={handleExportData}
+                  className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg text-sm transition"
+                >
+                  <Download className="w-4 h-4" />
+                  સેવ કરો
+                </button>
+                <button 
+                  onClick={handleImportClick}
+                  className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg text-sm transition"
+                >
+                  <Upload className="w-4 h-4" />
+                  રીસ્ટોર કરો
+                </button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  accept=".json" 
+                  className="hidden" 
+                />
               </div>
             </div>
+
             <button 
               onClick={() => setShowConfig(false)}
-              className="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700"
+              className="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700 mt-2"
             >
-              સાચવો (Save)
+              બંધ કરો (Close)
             </button>
           </div>
         )}
@@ -471,6 +577,15 @@ const App: React.FC = () => {
             colorClass="bg-orange-500 text-orange-500" 
           />
         </div>
+        
+        {/* WhatsApp Share Button */}
+        <button 
+          onClick={handleWhatsAppShare}
+          className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md transition"
+        >
+          <Share2 className="w-5 h-5" />
+          WhatsApp પર હિસાબ મોકલો
+        </button>
 
         {/* Reasons List Section (NEW) */}
         {reasonsList.length > 0 && (

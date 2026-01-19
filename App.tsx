@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Check,
   X,
-  MessageSquare
+  MessageSquare,
+  AlertCircle
 } from 'lucide-react';
 
 // Helpers
@@ -86,8 +87,6 @@ const App: React.FC = () => {
         newRecord = {
           ...current,
           [type]: value,
-          // If turning ON (true), clear the reason for NOT taking it? 
-          // Maybe keep it just in case they toggle back. Let's keep it but UI won't show it.
         };
         const newRecords = [...prev];
         newRecords[existingIndex] = newRecord;
@@ -163,6 +162,19 @@ const App: React.FC = () => {
 
     return { totalCowDays, totalBuffaloDays, totalCost, activeDays };
   }, [records, selectedDate, cowPrice, buffaloPrice]);
+
+  const reasonsList = useMemo(() => {
+    const currentYear = selectedDate.getFullYear();
+    const currentMonth = selectedDate.getMonth();
+    
+    return records
+      .filter(r => {
+        const d = new Date(r.date);
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+      })
+      .filter(r => (!r.cow && r.cowReason) || (!r.buffalo && r.buffaloReason))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [records, selectedDate]);
 
   const changeMonth = (offset: number) => {
     const newDate = new Date(selectedDate);
@@ -309,7 +321,7 @@ const App: React.FC = () => {
                     <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                     <input 
                       type="text"
-                      placeholder="કારણ? (દા.ત. બહારગામ)"
+                      placeholder="દૂધ ન લેવાનું કારણ લખો... (દા.ત. બહારગામ)"
                       value={currentRecord.cowReason || ''}
                       onChange={(e) => handleReasonChange(selectedDateStr, 'cow', e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-300 outline-none"
@@ -363,7 +375,7 @@ const App: React.FC = () => {
                     <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                     <input 
                       type="text"
-                      placeholder="કારણ? (દા.ત. બિમાર)"
+                      placeholder="દૂધ ન લેવાનું કારણ લખો... (દા.ત. બિમાર)"
                       value={currentRecord.buffaloReason || ''}
                       onChange={(e) => handleReasonChange(selectedDateStr, 'buffalo', e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-300 outline-none"
@@ -459,6 +471,39 @@ const App: React.FC = () => {
             colorClass="bg-orange-500 text-orange-500" 
           />
         </div>
+
+        {/* Reasons List Section (NEW) */}
+        {reasonsList.length > 0 && (
+          <section className="bg-white rounded-2xl shadow-sm border border-orange-100 p-4">
+            <div className="flex items-center gap-2 mb-3 border-b border-orange-100 pb-2">
+              <AlertCircle className="w-5 h-5 text-orange-500" />
+              <h3 className="font-bold text-gray-800">રજાની નોંધ (Reasons)</h3>
+            </div>
+            <div className="space-y-3">
+              {reasonsList.map(r => (
+                <div key={r.date} className="bg-orange-50 rounded-lg p-3 text-sm border border-orange-100">
+                  <div className="font-medium text-orange-900 mb-1 flex justify-between">
+                    <span>{formatDateDisplay(new Date(r.date))}</span>
+                  </div>
+                  <div className="space-y-1 pl-1">
+                    {!r.cow && r.cowReason && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 flex-shrink-0" />
+                        <span className="text-gray-700"><span className="font-medium">ગાય:</span> {r.cowReason}</span>
+                      </div>
+                    )}
+                    {!r.buffalo && r.buffaloReason && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                        <span className="text-gray-700"><span className="font-medium">ભેંસ:</span> {r.buffaloReason}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Gemini AI Insight Section */}
         <section className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-100">
